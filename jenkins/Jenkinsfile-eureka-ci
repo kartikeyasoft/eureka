@@ -17,14 +17,14 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/kartikeyasoft/eureka.git'
-                sh 'ls -la'
+                git credentialsId: 'gitlab', url: 'https://github.com/kartikeyasoft/eureka.git', branch: 'main'
             }
         }
 
         stage('Set Version') {
             steps {
                 script {
+                    // pom.xml is at the root, not inside server/
                     def pom = readMavenPom file: 'pom.xml'
                     env.SERVICE_VERSION = pom.version
                     echo "Building version: ${env.SERVICE_VERSION}"
@@ -34,18 +34,15 @@ pipeline {
 
         stage('Maven Build & Deploy to Nexus') {
             steps {
-                dir('server') {
-                    sh "mvn clean deploy -DskipTests"
-                }
+                // No need for dir('server') – we are already in root
+                sh "mvn clean deploy -DskipTests"
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                dir('server') {
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar'
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
                 }
             }
         }
@@ -57,7 +54,8 @@ pipeline {
                         "SERVICE_VERSION=${env.SERVICE_VERSION}",
                         "SERVICE_NAME=${SERVICE_NAME}"
                     ]) {
-                        dir('packer/eureka') {
+                        // Your eureka.pkr.hcl is directly under packer/
+                        dir('packer') {
                             sh '''
                                 packer init eureka.pkr.hcl
                                 packer build \
@@ -74,7 +72,7 @@ pipeline {
         stage('Record AMI ID') {
             steps {
                 script {
-                    dir('packer/eureka') {
+                    dir('packer') {
                         sh '''
                             packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
                             AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
