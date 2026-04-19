@@ -17,14 +17,14 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'gitlab', url: 'http://your-git/exam.git', branch: 'main'
+                git credentialsId: 'git branch: 'main', url: 'https://github.com/kartikeyasoft/eureka.git'
             }
         }
 
         stage('Set Version') {
             steps {
                 script {
-                    def pom = readMavenPom file: 'server/pom.xml'
+                    def pom = readMavenPom file: 'pom.xml'
                     env.SERVICE_VERSION = pom.version
                     echo "Building version: ${env.SERVICE_VERSION}"
                 }
