@@ -21,25 +21,45 @@ pipeline {
             }
         }
 
+        stage('Debug Workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'echo "Maven home: ${MAVEN_HOME}"'
+                sh 'mvn --version || echo "Maven not found"'
+                sh 'java -version || echo "Java not found"'
+                sh 'cat pom.xml | head -20 || echo "pom.xml not readable"'
+            }
+        }
+
         stage('Set Version') {
             steps {
                 script {
-                    // pom.xml is at the root, not inside server/
-                    def pom = readMavenPom file: 'pom.xml'
-                    env.SERVICE_VERSION = pom.version
-                    echo "Building version: ${env.SERVICE_VERSION}"
+                    try {
+                        // Read pom.xml from workspace root
+                        def pomFile = fileExists('pom.xml') ? 'pom.xml' : null
+                        if (!pomFile) {
+                            error 'pom.xml not found in workspace root'
+                        }
+                        def pom = readMavenPom file: pomFile
+                        env.SERVICE_VERSION = pom.version
+                        echo "Building version: ${env.SERVICE_VERSION}"
+                    } catch (Exception e) {
+                        echo "Failed to read pom.xml: ${e.getMessage()}"
+                        throw e
+                    }
                 }
             }
         }
 
         stage('Maven Build & Deploy to Nexus') {
             steps {
-                // No need for dir('server') – we are already in root
-                sh "mvn clean deploy -DskipTests"
+                sh 'mvn clean deploy -DskipTests'
             }
         }
 
         stage('SonarQube Analysis') {
+            when { expression { env.SONAR_HOST_URL != null } }
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh 'mvn sonar:sonar'
@@ -54,7 +74,6 @@ pipeline {
                         "SERVICE_VERSION=${env.SERVICE_VERSION}",
                         "SERVICE_NAME=${SERVICE_NAME}"
                     ]) {
-                        // Your eureka.pkr.hcl is directly under packer/
                         dir('packer') {
                             sh '''
                                 packer init eureka.pkr.hcl
@@ -90,7 +109,7 @@ pipeline {
             echo "Eureka CI & golden image built successfully."
         }
         failure {
-            echo "Eureka CI failed."
+            echo "Eureka CI failed. Check logs above."
         }
     }
 }
