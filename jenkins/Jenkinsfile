@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven-3.8'
+        jdk 'JDK-11'
+    }
+
+    environment {
+        NEXUS_URL = 'http://your-nexus:8081/repository/maven-releases'
+        NEXUS_CREDS = credentials('nexus-creds')
+        SERVICE_NAME = 'eureka'
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'gitlab', url: 'http://your-git/exam.git', branch: 'main'
+            }
+        }
+
+        stage('Set Version') {
+            steps {
+                script {
+                    def pom = readMavenPom file: 'server/pom.xml'
+                    env.SERVICE_VERSION = pom.version
+                    echo "Building version: ${env.SERVICE_VERSION}"
+                }
+            }
+        }
+
+        stage('Maven Build & Deploy to Nexus') {
+            steps {
+                dir('server') {
+                    sh "mvn clean deploy -DskipTests"
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir('server') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'mvn sonar:sonar'
+                    }
+                }
+            }
+        }
+
+        stage('Bake Golden Image') {
+            steps {
+                script {
+                    withEnv([
+                        "SERVICE_VERSION=${env.SERVICE_VERSION}",
+                        "SERVICE_NAME=${SERVICE_NAME}"
+                    ]) {
+                        dir('packer/eureka') {
+                            sh '''
+                                packer init eureka.pkr.hcl
+                                packer build \
+                                    -var "service_version=${SERVICE_VERSION}" \
+                                    -var "service_name=${SERVICE_NAME}" \
+                                    eureka.pkr.hcl
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Record AMI ID') {
+            steps {
+                script {
+                    dir('packer/eureka') {
+                        sh '''
+                            packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
+                            AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
+                            echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
+                        '''
+                        stash name: 'eureka-ami', includes: 'golden-ami.properties'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Eureka CI & golden image built successfully."
+        }
+        failure {
+            echo "Eureka CI failed."
+        }
+    }
+}

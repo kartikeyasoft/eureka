@@ -1,0 +1,52 @@
+---
+- name: Provision Eureka golden image
+  hosts: all
+  become: yes
+  vars:
+    app_user: "eureka"
+    app_name: "{{ lookup('env', 'SERVICE_NAME') }}"
+    app_version: "{{ lookup('env', 'SERVICE_VERSION') }}"
+    nexus_url: "{{ lookup('env', 'NEXUS_URL') }}"
+
+  tasks:
+    - name: Install Java 11
+      apt:
+        name: openjdk-11-jre-headless
+        state: present
+        update_cache: yes
+
+    - name: Create eureka user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        home: "/opt/{{ app_name }}"
+        create_home: yes
+
+    - name: Download Eureka JAR from Nexus
+      get_url:
+        url: "{{ nexus_url }}/com/ksapp/{{ app_name }}/{{ app_version }}/{{ app_name }}-{{ app_version }}.jar"
+        dest: "/opt/{{ app_name }}/{{ app_name }}.jar"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
+      retries: 3
+      delay: 5
+
+    - name: Create systemd service file
+      template:
+        src: eureka.service.j2
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+      notify: restart eureka
+
+    - name: Enable service (will start on boot)
+      systemd:
+        name: "{{ app_name }}"
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: restart eureka
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted
+        daemon_reload: yes
