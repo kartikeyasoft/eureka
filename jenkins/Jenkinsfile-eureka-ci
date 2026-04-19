@@ -18,6 +18,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/kartikeyasoft/eureka.git'
+                sh 'ls -la'
             }
         }
 
