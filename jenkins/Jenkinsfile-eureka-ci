@@ -17,7 +17,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'git branch: 'main', url: 'https://github.com/kartikeyasoft/eureka.git'
+                git branch: 'main', url: 'https://github.com/kartikeyasoft/eureka.git'
             }
         }
 
