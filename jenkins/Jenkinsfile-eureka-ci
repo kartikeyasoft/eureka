@@ -50,14 +50,15 @@ stage('Deploy to Nexus') {
     }
 }
 
-        stage('SonarQube Analysis') {
-            when { expression { env.SONAR_HOST_URL != null } }
+stage('SonarAnalysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar'
-                }
-            }
-        }
+                script {
+                    sonarScan(
+                        projectKey: 'data',
+                        projectName: 'eureka-${env.SERVICE_VERSION}',
+                        sources: '.'               
+                        
+                        )
 
         stage('Bake Golden Image') {
             steps {
