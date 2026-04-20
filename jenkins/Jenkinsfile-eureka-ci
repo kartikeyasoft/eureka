@@ -62,26 +62,26 @@ stage('SonarQube Analysis') {
         }
     }
 }
-        stage('Bake Golden Image') {
-            steps {
-                script {
-                    withEnv([
-                        "SERVICE_VERSION=${env.SERVICE_VERSION}",
-                        "SERVICE_NAME=${SERVICE_NAME}"
-                    ]) {
-                        dir('packer') {
-                            sh '''
-                                packer init eureka.pkr.hcl
-                                packer build \
-                                    -var "service_version=${SERVICE_VERSION}" \
-                                    -var "service_name=${SERVICE_NAME}" \
-                                    eureka.pkr.hcl
-                            '''
-                        }
-                    }
+       stage('Bake Golden Image') {
+    steps {
+        script {
+            withEnv([
+                "SERVICE_VERSION=${env.SERVICE_VERSION}",
+                "SERVICE_NAME=${SERVICE_NAME}"
+            ]) {
+                dir('packer') {
+                    sh '''
+                        /usr/local/bin/packer init eureka.pkr.hcl
+                        /usr/local/bin/packer build \
+                            -var "service_version=${SERVICE_VERSION}" \
+                            -var "service_name=${SERVICE_NAME}" \
+                            eureka.pkr.hcl
+                    '''
                 }
             }
         }
+    }
+}
 
         stage('Record AMI ID') {
             steps {
