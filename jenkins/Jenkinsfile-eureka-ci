@@ -30,14 +30,14 @@ pipeline {
             }
         }
 
-        stage('Maven Build & Deploy to Nexus') {
-            steps {
-                sh """
-                    mvn clean deploy -DskipTests \
-                        -DaltDeploymentRepository=nexus-releases::default::${NEXUS_URL}
-                """
-            }
-        }
+      stage('Maven Build & Deploy to Nexus') {
+    steps {
+        sh """
+            mvn clean deploy -Dmaven.test.skip=true \
+                -DaltDeploymentRepository=nexus-releases::default::${NEXUS_URL}
+        """
+    }
+}
 
         stage('SonarQube Analysis') {
             when { expression { env.SONAR_HOST_URL != null } }
