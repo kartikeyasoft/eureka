@@ -21,7 +21,7 @@ variable "service_version" {
 
 variable "base_image" {
   type    = string
-  default = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+  default = "ami-0ec10929233384c7f"
 }
 
 variable "nexus_url" {
