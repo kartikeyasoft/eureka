@@ -21,6 +21,14 @@ pipeline {
                 git url: 'https://github.com/kartikeyasoft/eureka.git', branch: 'main'
             }
         }
+    stage('Debug Workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'which packer || echo "Packer not found"'
+                sh 'packer --version || echo "Packer version check failed"'
+            }
+        }
 
         stage('Set Version') {
             steps {
@@ -62,41 +70,42 @@ stage('SonarQube Analysis') {
         }
     }
 }
-     stage('Bake Golden Image') {
-    steps {
-        script {
-            withEnv([
-                "SERVICE_VERSION=${env.SERVICE_VERSION}",
-                "SERVICE_NAME=${SERVICE_NAME}"
-            ]) {
-                dir('packer') {
-                    sh '''
-                        /usr/bin/packer init eureka.pkr.hcl
-                        /usr/bin/packer build \
-                            -var "service_version=${SERVICE_VERSION}" \
-                            -var "service_name=${SERVICE_NAME}" \
-                            eureka.pkr.hcl
-                    '''
+            stage('Bake Golden Image') {
+            steps {
+                script {
+                    withEnv([
+                        "SERVICE_VERSION=${env.SERVICE_VERSION}",
+                        "SERVICE_NAME=${env.SERVICE_NAME}"
+                    ]) {
+                        dir('packer') {
+                            sh '''
+                                packer init eureka.pkr.hcl
+                                packer build \
+                                    -var "service_version=${SERVICE_VERSION}" \
+                                    -var "service_name=${SERVICE_NAME}" \
+                                    eureka.pkr.hcl
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Record AMI ID') {
+            steps {
+                script {
+                    dir('packer') {
+                        sh '''
+                            packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
+                            AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
+                            echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
+                        '''
+                        stash name: 'eureka-ami', includes: 'golden-ami.properties'
+                    }
                 }
             }
         }
     }
-}
-
-      stage('Record AMI ID') {
-    steps {
-        script {
-            dir('packer') {
-                sh '''
-                    /usr/bin/packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
-                    AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
-                    echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
-                '''
-                stash name: 'eureka-ami', includes: 'golden-ami.properties'
-            }
-        }
-    }
-}
 
     post {
         success {
