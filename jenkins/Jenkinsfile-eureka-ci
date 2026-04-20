@@ -32,14 +32,11 @@ pipeline {
             }
         }
 
-  stage('Set Version') {
+stage('Set Version') {
     steps {
-        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-            script {
-                def pom = readMavenPom file: 'pom.xml'
-                env.SERVICE_VERSION = pom.version
-                echo "Building version: ${env.SERVICE_VERSION}"
-            }
+        script {
+            env.SERVICE_VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout', returnStdout: true).trim()
+            echo "Building version: ${env.SERVICE_VERSION}"
         }
     }
 }
