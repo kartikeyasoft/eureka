@@ -34,10 +34,12 @@ pipeline {
 
   stage('Set Version') {
     steps {
-        script {
-            def pom = readMavenPom file: 'pom.xml'
-            env.SERVICE_VERSION = pom.version
-            echo "Building version: ${env.SERVICE_VERSION}"
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+            script {
+                def pom = readMavenPom file: 'pom.xml'
+                env.SERVICE_VERSION = pom.version
+                echo "Building version: ${env.SERVICE_VERSION}"
+            }
         }
     }
 }
