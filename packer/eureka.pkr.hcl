@@ -21,7 +21,7 @@ variable "service_version" {
 
 variable "base_image" {
   type    = string
-  default = "ami-0ec10929233384c7f"
+  default = "ami-04680790a315cd58d"
 }
 
 variable "nexus_url" {
