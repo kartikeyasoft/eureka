@@ -1,16 +1,32 @@
+packer {
+  required_plugins {
+    amazon = {
+      version = ">= 1.2.8"
+      source  = "github.com/hashicorp/amazon"
+    }
+    ansible = {
+      version = ">= 1.1.1"
+      source  = "github.com/hashicorp/ansible"
+    }
+  }
+}
+
 variable "service_name" {
   type = string
 }
+
 variable "service_version" {
   type = string
 }
+
 variable "base_image" {
   type    = string
   default = "ubuntu-focal-22.04"
 }
+
 variable "nexus_url" {
   type    = string
-  default = "http://your-nexus:8081/repository/maven-releases"
+  default = "http://172.21.12.151:8081/repository/maven-releases"
 }
 
 source "amazon-ebs" "eureka" {
@@ -24,7 +40,7 @@ source "amazon-ebs" "eureka" {
       virtualization-type = "hvm"
     }
     most_recent = true
-    owners      = ["099720109477"]
+    owners      = ["535002892825"]
   }
   ssh_username = "ubuntu"
 }
