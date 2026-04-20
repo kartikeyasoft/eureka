@@ -30,12 +30,22 @@ pipeline {
             }
         }
 
-      stage('Maven Build & Deploy to Nexus') {
+    stage('Maven Build') {
     steps {
-        sh """
-            mvn clean deploy -Dmaven.test.skip=true \
-                -DaltDeploymentRepository=nexus-releases::default::${NEXUS_URL}
-        """
+        sh 'mvn clean package -Dmaven.test.skip=true'
+    }
+}
+
+stage('Deploy to Nexus') {
+    steps {
+        script {
+            def nexusCreds = env.NEXUS_CREDS   // expects format "username:password"
+            def jarFile = "target/eureka-${env.SERVICE_VERSION}.jar"
+            def nexusPath = "${env.NEXUS_URL}/com/ksapp/eureka/${env.SERVICE_VERSION}/eureka-${env.SERVICE_VERSION}.jar"
+            sh """
+                curl -v -u ${nexusCreds} --upload-file ${jarFile} ${nexusPath}
+            """
+        }
     }
 }
 
