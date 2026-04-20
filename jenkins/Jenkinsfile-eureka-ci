@@ -32,25 +32,15 @@ pipeline {
             }
         }
 
-        stage('Set Version') {
-            steps {
-                script {
-                    try {
-                        // Read pom.xml from workspace root
-                        def pomFile = fileExists('pom.xml') ? 'pom.xml' : null
-                        if (!pomFile) {
-                            error 'pom.xml not found in workspace root'
-                        }
-                        def pom = readMavenPom file: pomFile
-                        env.SERVICE_VERSION = pom.version
-                        echo "Building version: ${env.SERVICE_VERSION}"
-                    } catch (Exception e) {
-                        echo "Failed to read pom.xml: ${e.getMessage()}"
-                        throw e
-                    }
-                }
-            }
+  stage('Set Version') {
+    steps {
+        script {
+            def pom = readMavenPom file: 'pom.xml'
+            env.SERVICE_VERSION = pom.version
+            echo "Building version: ${env.SERVICE_VERSION}"
         }
+    }
+}
 
         stage('Maven Build & Deploy to Nexus') {
             steps {
