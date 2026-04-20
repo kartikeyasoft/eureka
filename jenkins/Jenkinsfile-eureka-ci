@@ -51,16 +51,15 @@ stage('Deploy to Nexus') {
 }
 
 stage('SonarAnalysis') {
-            steps {
-                script {
-                    sonarScan(
-                        projectKey: 'data',
-                        projectName: 'eureka-${env.SERVICE_VERSION}',
-                        sources: '.'               
-                        
-                        )
-}
-}
+    steps {
+        script {
+            sonarScan(
+                projectKey: 'eureka',
+                projectName: "eureka-${env.SERVICE_VERSION}",
+                sources: '.'
+            )
+        }
+    }
 }
 
         stage('Bake Golden Image') {
