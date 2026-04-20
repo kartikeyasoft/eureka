@@ -21,7 +21,7 @@ variable "service_version" {
 
 variable "base_image" {
   type    = string
-  default = "ubuntu-focal-22.04"
+  default = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
 }
 
 variable "nexus_url" {
