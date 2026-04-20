@@ -50,18 +50,18 @@ stage('Deploy to Nexus') {
     }
 }
 
-stage('SonarAnalysis') {
+stage('SonarQube Analysis') {
     steps {
         script {
             sonarScan(
-                projectKey: 'eureka',
+                projectKey: 'com.ksapp:eureka',
                 projectName: "eureka-${env.SERVICE_VERSION}",
-                sources: '.'
+                sources: 'src/main/java',
+                binaries: 'target/classes'
             )
         }
     }
 }
-
         stage('Bake Golden Image') {
             steps {
                 script {
