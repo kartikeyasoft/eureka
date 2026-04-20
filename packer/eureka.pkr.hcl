@@ -19,11 +19,6 @@ variable "service_version" {
   type = string
 }
 
-variable "base_image" {
-  type    = string
-  default = "ami-0e617bede86700a41"
-}
-
 variable "nexus_url" {
   type    = string
   default = "http://172.21.12.151:8081/repository/maven-releases"
@@ -33,16 +28,8 @@ source "amazon-ebs" "eureka" {
   ami_name        = "myapp-${var.service_name}-v${var.service_version}"
   instance_type   = "t3.micro"
   region          = "us-east-1"
-  source_ami_filter {
-    filters = {
-      name                = "${var.base_image}-*"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    most_recent = true
-    owners      = ["535002892825"]
-  }
-  ssh_username = "ubuntu"
+  source_ami      = "ami-0c7217cdde317cfec"
+  ssh_username    = "ubuntu"
 }
 
 build {
