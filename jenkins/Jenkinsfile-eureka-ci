@@ -59,6 +59,9 @@ stage('SonarAnalysis') {
                         sources: '.'               
                         
                         )
+}
+}
+}
 
         stage('Bake Golden Image') {
             steps {
