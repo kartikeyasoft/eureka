@@ -55,7 +55,7 @@
     <distributionManagement>
         <repository>
             <id>nexus-releases</id>
-            <url>http://your-nexus:8081/repository/maven-releases</url>
+            <url>${env.NEXUS_URL}</url>
         </repository>
         <snapshotRepository>
             <id>nexus-snapshots</id>
