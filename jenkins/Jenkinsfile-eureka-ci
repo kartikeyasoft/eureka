@@ -62,7 +62,7 @@ stage('SonarQube Analysis') {
         }
     }
 }
-       stage('Bake Golden Image') {
+     stage('Bake Golden Image') {
     steps {
         script {
             withEnv([
@@ -71,8 +71,8 @@ stage('SonarQube Analysis') {
             ]) {
                 dir('packer') {
                     sh '''
-                        /usr/local/bin/packer init eureka.pkr.hcl
-                        /usr/local/bin/packer build \
+                        /usr/bin/packer init eureka.pkr.hcl
+                        /usr/bin/packer build \
                             -var "service_version=${SERVICE_VERSION}" \
                             -var "service_name=${SERVICE_NAME}" \
                             eureka.pkr.hcl
@@ -83,21 +83,20 @@ stage('SonarQube Analysis') {
     }
 }
 
-        stage('Record AMI ID') {
-            steps {
-                script {
-                    dir('packer') {
-                        sh '''
-                            packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
-                            AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
-                            echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
-                        '''
-                        stash name: 'eureka-ami', includes: 'golden-ami.properties'
-                    }
-                }
+      stage('Record AMI ID') {
+    steps {
+        script {
+            dir('packer') {
+                sh '''
+                    /usr/bin/packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
+                    AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
+                    echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
+                '''
+                stash name: 'eureka-ami', includes: 'golden-ami.properties'
             }
         }
     }
+}
 
     post {
         success {
