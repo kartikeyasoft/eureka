@@ -56,14 +56,17 @@ pipeline {
                     if (!params.KEY_NAME) {
                         error "KEY_NAME parameter is required"
                     }
+                    echo "All parameters validated successfully"
                 }
             }
         }
 
         stage('Manual Approval') {
-            input {
-                message "Deploy Eureka with AMI ${env.AMI_ID} to ${params.ACTION}?"
-                ok "Proceed"
+            steps {
+                input(
+                    message: "Deploy Eureka with AMI ${env.AMI_ID} to ${params.ACTION}?",
+                    ok: "Proceed"
+                )
             }
         }
 
