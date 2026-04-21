@@ -25,19 +25,19 @@ variable "instance_type" {
 variable "subnet_id" {
   description = "Subnet ID for the instance"
   type        = string
-  default     = "subnet-0aa31e769c8f4d73e"  # ← Your actual subnet ID
+  # No default - will be passed from Jenkins
 }
 
 variable "vpc_id" {
   description = "VPC ID for security group"
   type        = string
-  default     = "vpc-0cb7deb47a6bfa727"  # ← Your actual VPC ID
+  # No default - will be passed from Jenkins
 }
 
 variable "key_name" {
   description = "SSH key pair name"
   type        = string
-  default     = "ksansible"  # ← Your actual key pair name
+  # No default - will be passed from Jenkins
 }
 
 variable "assign_eip" {
