@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'AMI_ID', defaultValue: '', description: 'Eureka AMI ID (optional for destroy)')
+        string(name: 'AMI_ID', defaultValue: '', description: 'Eureka AMI ID')
         choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Terraform action')
     }
 
@@ -27,7 +27,6 @@ pipeline {
                     echo "AMI ID: ${params.AMI_ID}"
                     echo "=========================================="
                     
-                    // Only require AMI_ID for apply action
                     if (params.ACTION == 'apply' && (!params.AMI_ID || params.AMI_ID == '')) {
                         error "AMI_ID is required for apply action"
                     }
@@ -69,7 +68,6 @@ pipeline {
             when { expression { params.ACTION == 'destroy' } }
             steps {
                 dir('terraform/eureka') {
-                    # For destroy, we don't need to pass ami_id
                     sh 'terraform destroy -auto-approve'
                 }
             }
