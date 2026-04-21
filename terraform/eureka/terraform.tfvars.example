@@ -1,4 +1,7 @@
-aws_region         = "us-east-1"
-subnet_id          = "subnet-0abc123def456"
-security_group_ids = ["sg-0123abcd"]
-# ami_id = "ami-12345678"   # optional
+aws_region   = "us-east-1"
+environment  = "production"
+subnet_id    = "subnet-0abc123def456"
+vpc_id       = "vpc-0abc123def456"
+key_name     = "your-key-pair-name"
+assign_eip   = false
+# ami_id     = "ami-xxxxx"  # Optional: specify specific AMI
