@@ -14,6 +14,7 @@
         update_cache: yes
         cache_valid_time: 3600
 
+
     - name: Install prerequisites
       apt:
         name:
@@ -44,10 +45,9 @@
 
     - name: Display Java version
       debug:
-        msg: "{{ java_version.stderr }}"
+        msg: "{{ java_version.stderr }}"    
 
-        
-     - name: Create eureka user
+    - name: Create eureka user
       user:
         name: "{{ app_user }}"
         system: yes
@@ -64,6 +64,10 @@
 
     - name: Create application.yml
       copy:
+        dest: "/opt/{{ app_name }}/application.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
         content: |
           server:
             port: 8761
@@ -91,10 +95,6 @@
               inetutils:
                 preferred-networks:
                   - 172.31
-        dest: "/opt/{{ app_name }}/application.yml"
-        owner: "{{ app_user }}"
-        group: "{{ app_user }}"
-        mode: '0644'
 
     - name: Download Eureka JAR from Nexus
       get_url:
@@ -106,9 +106,12 @@
         timeout: 120
       retries: 3
       delay: 10
+      register: download_result
+      until: download_result is success
 
     - name: Create systemd service file
       copy:
+        dest: "/etc/systemd/system/{{ app_name }}.service"
         content: |
           [Unit]
           Description=Eureka Service Registry
@@ -127,18 +130,13 @@
           
           [Install]
           WantedBy=multi-user.target
-        dest: "/etc/systemd/system/{{ app_name }}.service"
-      notify: restart eureka
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
 
     - name: Enable and start service
       systemd:
         name: "{{ app_name }}"
         enabled: yes
         state: started
-
-  handlers:
-    - name: restart eureka
-      systemd:
-        name: "{{ app_name }}"
-        state: restarted
-        daemon_reload: yes
