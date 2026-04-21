@@ -60,7 +60,8 @@ pipeline {
                         "NEXUS_URL=${env.NEXUS_URL}"
                     ]) {
                         dir('packer') {
-                            sh '''
+                            // Capture AMI ID directly
+                            env.AMI_ID = sh(script: '''
                                 packer init eureka.pkr.hcl
                                 packer build \
                                     -var "service_version=${SERVICE_VERSION}" \
@@ -71,7 +72,10 @@ pipeline {
                                 AMI_ID=$(grep -oP 'ami-[a-f0-9]+' build-output.txt | tail -1)
                                 echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
                                 echo "Successfully created AMI: $AMI_ID"
-                            '''
+                                echo $AMI_ID
+                            ''', returnStdout: true).trim()
+                            
+                            echo "✅ Captured AMI ID: ${env.AMI_ID}"
                             stash name: 'eureka-ami', includes: 'golden-ami.properties'
                         }
                     }
@@ -82,16 +86,17 @@ pipeline {
         stage('Trigger CD Pipeline') {
             steps {
                 script {
-                    def amiProps = readProperties file: 'packer/golden-ami.properties'
-                    def amiId = amiProps['GOLDEN_AMI_ID']
-                    
                     echo "=========================================="
-                    echo "Triggering CD with AMI: ${amiId}"
+                    echo "🎉 Golden Image Created Successfully!"
+                    echo "=========================================="
+                    echo "AMI ID: ${env.AMI_ID}"
+                    echo "Version: ${env.SERVICE_VERSION}"
                     echo "=========================================="
                     
+                    // Trigger CD pipeline
                     build job: 'eureka-cd',
                         parameters: [
-                            string(name: 'AMI_ID', value: amiId),
+                            string(name: 'AMI_ID', value: env.AMI_ID),
                             string(name: 'ACTION', value: 'apply'),
                             string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
                             string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
@@ -100,6 +105,7 @@ pipeline {
                         wait: false
                     
                     echo "✅ CD pipeline triggered successfully!"
+                    echo "Check Jenkins job: eureka-cd"
                 }
             }
         }
@@ -108,9 +114,10 @@ pipeline {
     post {
         success {
             echo "🎉 Eureka CI completed successfully!"
+            echo "AMI: ${env.AMI_ID}"
         }
         failure {
-            echo "⚠️ Eureka CI had issues, but CD may have been triggered"
+            echo "⚠️ Eureka CI failed. Check logs above."
         }
     }
 }
