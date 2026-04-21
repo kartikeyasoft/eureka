@@ -15,7 +15,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Data source to get the latest Eureka AMI
+# Data source to get the latest Eureka AMI (fallback if not provided)
 data "aws_ami" "eureka" {
   most_recent = true
   owners      = ["self"]
@@ -82,3 +82,14 @@ resource "aws_instance" "eureka" {
   }
 }
 
+# Elastic IP (Optional)
+resource "aws_eip" "eureka" {
+  count    = var.assign_eip ? 1 : 0
+  instance = aws_instance.eureka.id
+  domain   = "vpc"
+
+  tags = {
+    Name        = "eureka-eip-${var.environment}"
+    Environment = var.environment
+  }
+}
