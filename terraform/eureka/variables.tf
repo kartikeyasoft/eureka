@@ -4,8 +4,14 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+  default     = "production"
+}
+
 variable "ami_id" {
-  description = "Specific AMI ID (leave empty to use latest golden)"
+  description = "Eureka AMI ID (leave empty to use latest)"
   type        = string
   default     = ""
 }
@@ -21,7 +27,18 @@ variable "subnet_id" {
   type        = string
 }
 
-variable "security_group_ids" {
-  description = "List of security group IDs"
-  type        = list(string)
+variable "vpc_id" {
+  description = "VPC ID for security group"
+  type        = string
+}
+
+variable "key_name" {
+  description = "SSH key pair name"
+  type        = string
+}
+
+variable "assign_eip" {
+  description = "Assign Elastic IP to instance"
+  type        = bool
+  default     = false
 }
