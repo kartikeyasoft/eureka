@@ -4,11 +4,14 @@ After=network.target
 
 [Service]
 User={{ app_user }}
+Group={{ app_user }}
 WorkingDirectory=/opt/{{ app_name }}
-ExecStart=/usr/bin/java -jar {{ app_name }}.jar
+ExecStart=/usr/bin/java -jar {{ app_name }}.jar --spring.config.location=file:/opt/{{ app_name }}/application.yml
 SuccessExitStatus=143
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 # Environment variables (optional - remove if using hardcoded config)
 Environment="EUREKA_HOST=%H"
