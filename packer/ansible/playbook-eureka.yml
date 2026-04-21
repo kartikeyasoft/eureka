@@ -24,7 +24,7 @@
 
     - name: Download Eureka JAR from Nexus
       get_url:
-        url: "{{ nexus_url }}/com/ksapp/{{ app_name }}/{{ app_version }}/{{ app_name }}-{{ app_version }}.jar"
+        url: "{{ lookup('env', 'NEXUS_URL') }}/com/ksapp/eureka/{{ lookup('env', 'SERVICE_VERSION') }}/eureka-{{ lookup('env', 'SERVICE_VERSION') }}.jar"
         dest: "/opt/{{ app_name }}/{{ app_name }}.jar"
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
