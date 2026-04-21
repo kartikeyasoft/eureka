@@ -25,5 +25,5 @@ output "used_ami_id" {
 
 output "security_group_id" {
   description = "Security group ID used for Eureka"
-  value       = local.security_group_id
+  value       = aws_security_group.eureka.id
 }
