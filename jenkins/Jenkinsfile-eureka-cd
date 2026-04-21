@@ -4,18 +4,12 @@ pipeline {
     parameters {
         string(name: 'AMI_ID', defaultValue: '', description: 'Eureka AMI ID (leave empty for latest)')
         choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Terraform action')
-        string(name: 'SUBNET_ID', defaultValue: '', description: 'Subnet ID for deployment')
-        string(name: 'VPC_ID', defaultValue: '', description: 'VPC ID for security group')
-        string(name: 'KEY_NAME', defaultValue: '', description: 'SSH key pair name')
     }
 
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
         AWS_DEFAULT_REGION    = 'us-east-1'
-        TF_VAR_subnet_id      = "${params.SUBNET_ID}"
-        TF_VAR_vpc_id         = "${params.VPC_ID}"
-        TF_VAR_key_name       = "${params.KEY_NAME}"
         TF_VAR_environment    = 'production'
     }
 
@@ -30,38 +24,52 @@ pipeline {
             steps {
                 script {
                     if (params.AMI_ID == '') {
-                        env.AMI_ID = sh(script: """
+                        # Get both AMI ID and AMI Name
+                        def ami_info = sh(script: """
                             aws ec2 describe-images \
                                 --region us-east-1 \
                                 --owners self \
                                 --filters "Name=name,Values=myapp-eureka-v*" \
-                                --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
-                                --output text
+                                --query 'Images | sort_by(@, &CreationDate) | [-1]' \
+                                --output json
+                        """, returnStdout: true).trim()
+                        
+                        # Parse AMI ID and Name
+                        env.AMI_ID = sh(script: """
+                            echo '${ami_info}' | jq -r '.ImageId'
+                        """, returnStdout: true).trim()
+                        
+                        env.AMI_NAME = sh(script: """
+                            echo '${ami_info}' | jq -r '.Name'
+                        """, returnStdout: true).trim()
+                        
+                        # Extract version from AMI name
+                        env.AMI_VERSION = sh(script: """
+                            echo '${env.AMI_NAME}' | sed 's/myapp-eureka-v//'
                         """, returnStdout: true).trim()
                     } else {
                         env.AMI_ID = params.AMI_ID
+                        # Get AMI name for provided ID
+                        env.AMI_NAME = sh(script: """
+                            aws ec2 describe-images \
+                                --region us-east-1 \
+                                --image-ids ${env.AMI_ID} \
+                                --query 'Images[0].Name' \
+                                --output text
+                        """, returnStdout: true).trim()
+                        
+                        env.AMI_VERSION = sh(script: """
+                            echo '${env.AMI_NAME}' | sed 's/myapp-eureka-v//'
+                        """, returnStdout: true).trim()
                     }
-                    echo "Deploying Eureka with AMI: ${env.AMI_ID}"
-                }
-            }
-        }
-
-        stage('Validate Parameters') {
-            steps {
-                script {
-                    if (!params.SUBNET_ID) {
-                        error "SUBNET_ID parameter is required"
-                    }
-                    if (!params.VPC_ID) {
-                        error "VPC_ID parameter is required"
-                    }
-                    if (!params.KEY_NAME) {
-                        error "KEY_NAME parameter is required"
-                    }
-                    echo "All parameters validated successfully"
-                    echo "Subnet: ${params.SUBNET_ID}"
-                    echo "VPC: ${params.VPC_ID}"
-                    echo "Key Pair: ${params.KEY_NAME}"
+                    
+                    echo "=========================================="
+                    echo "AMI Information"
+                    echo "=========================================="
+                    echo "AMI ID: ${env.AMI_ID}"
+                    echo "AMI Name: ${env.AMI_NAME}"
+                    echo "AMI Version: ${env.AMI_VERSION}"
+                    echo "=========================================="
                 }
             }
         }
@@ -69,7 +77,7 @@ pipeline {
         stage('Manual Approval') {
             steps {
                 input(
-                    message: "Deploy Eureka with AMI ${env.AMI_ID} to ${params.ACTION}?",
+                    message: "Deploy Eureka Version ${env.AMI_VERSION} (AMI: ${env.AMI_ID}) to ${params.ACTION}?",
                     ok: "Proceed"
                 )
             }
@@ -120,6 +128,8 @@ pipeline {
                         echo "=========================================="
                         echo "Eureka Deployment Successful!"
                         echo "=========================================="
+                        echo "AMI Version: ${env.AMI_VERSION}"
+                        echo "AMI ID: ${env.AMI_ID}"
                         echo "Public IP: ${public_ip}"
                         echo "Dashboard URL: ${dashboard_url}"
                         echo "=========================================="
