@@ -1,4 +1,5 @@
 @Library('jenkins-shared-lib-deno@main') _
+
 pipeline {
     agent any
 
@@ -51,81 +52,88 @@ pipeline {
             }
         }
 
-      stage('Bake Golden Image') {
-    steps {
-        script {
-            withEnv([
-                "SERVICE_VERSION=${env.SERVICE_VERSION}",
-                "SERVICE_NAME=${env.SERVICE_NAME}",
-                "NEXUS_URL=${env.NEXUS_URL}"
-            ]) {
-                dir('packer') {
-                    sh '''
-                        packer init eureka.pkr.hcl
-                        packer build \
-                            -var "service_version=${SERVICE_VERSION}" \
-                            -var "service_name=${SERVICE_NAME}" \
-                            -var "nexus_url=${NEXUS_URL}" \
-                            eureka.pkr.hcl 2>&1 | tee build-output.txt
-                        
-                        # Extract ONLY the AMI ID (17 character hex)
-                        AMI_ID=$(grep -oE 'ami-[a-f0-9]{17}' build-output.txt | tail -1)
-                        echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
-                        echo "Successfully created AMI: $AMI_ID"
-                    '''
-                    
-                    // Read and validate AMI ID
-                    def amiProps = readFile('golden-ami.properties')
-                    env.AMI_ID = amiProps.split('=')[1].trim()
+        stage('Bake Golden Image') {
+            steps {
+                script {
+                    withEnv([
+                        "SERVICE_VERSION=${env.SERVICE_VERSION}",
+                        "SERVICE_NAME=${env.SERVICE_NAME}",
+                        "NEXUS_URL=${env.NEXUS_URL}"
+                    ]) {
+                        dir('packer') {
+                            sh '''
+                                packer init eureka.pkr.hcl
+                                packer build \
+                                    -var "service_version=${SERVICE_VERSION}" \
+                                    -var "service_name=${SERVICE_NAME}" \
+                                    -var "nexus_url=${NEXUS_URL}" \
+                                    eureka.pkr.hcl 2>&1 | tee build-output.txt
+                                
+                                # Extract clean AMI ID
+                                AMI_ID=$(grep -oE 'ami-[a-f0-9]{17}' build-output.txt | tail -1)
+                                echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
+                                echo "Successfully created AMI: $AMI_ID"
+                            '''
+                            
+                            // Read and validate AMI ID
+                            script {
+                                def amiProps = readFile('golden-ami.properties')
+                                env.AMI_ID = amiProps.split('=')[1].trim()
+                                echo "✅ Captured AMI ID: ${env.AMI_ID}"
+                            }
+                            stash name: 'eureka-ami', includes: 'golden-ami.properties'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Trigger CD Pipeline') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "AMI ID: ${env.AMI_ID}"
+                    echo "Version: ${env.SERVICE_VERSION}"
+                    echo "=========================================="
                     
                     // Validate AMI ID format
-                    if (!(env.AMI_ID =~ /^ami-[a-f0-9]{17}$/)) {
-                        error "Invalid AMI ID format: ${env.AMI_ID}"
+                    if (env.AMI_ID && env.AMI_ID =~ /^ami-[a-f0-9]{17}$/) {
+                        echo "✅ Valid AMI ID, triggering CD pipeline..."
+                        
+                        // Trigger CD pipeline - make sure job exists
+                        build job: 'eureka-cd',
+                            parameters: [
+                                string(name: 'AMI_ID', value: env.AMI_ID),
+                                string(name: 'ACTION', value: 'apply'),
+                                string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
+                                string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
+                                string(name: 'KEY_NAME', value: 'ksansible')
+                            ],
+                            wait: false
+                        
+                        echo "✅ CD pipeline triggered successfully!"
+                    } else {
+                        echo "⚠️ Invalid AMI ID format: ${env.AMI_ID}"
+                        echo "Skipping CD trigger"
                     }
-                    
-                    echo "✅ Valid AMI ID: ${env.AMI_ID}"
-                    stash name: 'eureka-ami', includes: 'golden-ami.properties'
                 }
             }
         }
     }
-}
-}
-
-stage('Trigger CD Pipeline') {
-    steps {
-        script {
-            echo "=========================================="
-            echo "AMI ID: ${env.AMI_ID}"
-            echo "Version: ${env.SERVICE_VERSION}"
-            echo "=========================================="
-            
-            // Only trigger if AMI ID is valid
-            if (env.AMI_ID && env.AMI_ID =~ /^ami-[a-f0-9]{17}$/) {
-                build job: 'eureka-cd',
-                    parameters: [
-                        string(name: 'AMI_ID', value: env.AMI_ID),
-                        string(name: 'ACTION', value: 'apply'),
-                        string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
-                        string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
-                        string(name: 'KEY_NAME', value: 'ksansible')
-                    ],
-                    wait: false
-                echo "✅ CD pipeline triggered successfully!"
-            } else {
-                error "Invalid AMI ID: ${env.AMI_ID}. Cannot trigger CD pipeline."
-            }
-        }
-    }
-}
 
     post {
         success {
+            echo "=========================================="
             echo "🎉 Eureka CI completed successfully!"
-            echo "AMI: ${env.AMI_ID}"
+            echo "AMI ID: ${env.AMI_ID}"
+            echo "Version: ${env.SERVICE_VERSION}"
+            echo "=========================================="
         }
         failure {
-            echo "⚠️ Eureka CI failed. Check logs above."
+            echo "=========================================="
+            echo "❌ Eureka CI failed!"
+            echo "Check the logs above for details"
+            echo "=========================================="
         }
     }
 }
