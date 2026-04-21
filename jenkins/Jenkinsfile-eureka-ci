@@ -75,7 +75,6 @@ pipeline {
                                 echo "Successfully created AMI: $AMI_ID"
                             '''
                             
-                            // Read and validate AMI ID
                             script {
                                 def amiProps = readFile('golden-ami.properties')
                                 env.AMI_ID = amiProps.split('=')[1].trim()
@@ -96,25 +95,19 @@ pipeline {
                     echo "Version: ${env.SERVICE_VERSION}"
                     echo "=========================================="
                     
-                    // Validate AMI ID format
                     if (env.AMI_ID && env.AMI_ID =~ /^ami-[a-f0-9]{17}$/) {
                         echo "✅ Valid AMI ID, triggering CD pipeline..."
                         
-                        // Trigger CD pipeline - make sure job exists
                         build job: 'eureka-cd',
                             parameters: [
                                 string(name: 'AMI_ID', value: env.AMI_ID),
-                                string(name: 'ACTION', value: 'apply'),
-                                string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
-                                string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
-                                string(name: 'KEY_NAME', value: 'ksansible')
+                                string(name: 'ACTION', value: 'apply')
                             ],
                             wait: false
                         
                         echo "✅ CD pipeline triggered successfully!"
                     } else {
                         echo "⚠️ Invalid AMI ID format: ${env.AMI_ID}"
-                        echo "Skipping CD trigger"
                     }
                 }
             }
@@ -123,17 +116,10 @@ pipeline {
 
     post {
         success {
-            echo "=========================================="
-            echo "🎉 Eureka CI completed successfully!"
-            echo "AMI ID: ${env.AMI_ID}"
-            echo "Version: ${env.SERVICE_VERSION}"
-            echo "=========================================="
+            echo "🎉 Eureka CI completed successfully! AMI: ${env.AMI_ID}"
         }
         failure {
-            echo "=========================================="
             echo "❌ Eureka CI failed!"
-            echo "Check the logs above for details"
-            echo "=========================================="
         }
     }
 }
