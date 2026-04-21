@@ -55,8 +55,7 @@ pipeline {
       stage('Set AMI ID') {
     steps {
         script {
-            if (params.AMI_ID == '') {
-                # Get AMI ID
+            if (params.AMI_ID == '') {               
                 env.AMI_ID = sh(script: """
                     aws ec2 describe-images \
                         --region us-east-1 \
