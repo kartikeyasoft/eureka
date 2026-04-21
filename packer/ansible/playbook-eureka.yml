@@ -9,11 +9,15 @@
     nexus_url: "{{ lookup('env', 'NEXUS_URL') }}"
 
   tasks:
-    - name: Install Java 11
+    - name: Update apt cache
       apt:
-        name: openjdk-11-jre-headless
-        state: present
         update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Java 17 (more stable on Ubuntu 22.04)
+      apt:
+        name: openjdk-17-jre-headless
+        state: present
 
     - name: Create eureka user
       user:
@@ -22,15 +26,24 @@
         home: "/opt/{{ app_name }}"
         create_home: yes
 
+    - name: Create application directory
+      file:
+        path: "/opt/{{ app_name }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
     - name: Download Eureka JAR from Nexus
       get_url:
-        url: "{{ lookup('env', 'NEXUS_URL') }}/com/ksapp/eureka/{{ lookup('env', 'SERVICE_VERSION') }}/eureka-{{ lookup('env', 'SERVICE_VERSION') }}.jar"
+        url: "{{ nexus_url }}/com/ksapp/{{ app_name }}/{{ app_version }}/{{ app_name }}-{{ app_version }}.jar"
         dest: "/opt/{{ app_name }}/{{ app_name }}.jar"
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         mode: '0644'
+        timeout: 60
       retries: 3
-      delay: 5
+      delay: 10
 
     - name: Create systemd service file
       template:
