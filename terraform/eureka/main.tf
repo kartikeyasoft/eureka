@@ -26,7 +26,7 @@ data "aws_ami" "eureka" {
   }
 }
 
-# Create security group (always create new one)
+# Create security group
 resource "aws_security_group" "eureka" {
   name        = "eureka-sg-${var.environment}"
   description = "Security group for Eureka service registry"
@@ -82,14 +82,3 @@ resource "aws_instance" "eureka" {
   }
 }
 
-# Elastic IP (Optional)
-resource "aws_eip" "eureka" {
-  count    = var.assign_eip ? 1 : 0
-  instance = aws_instance.eureka.id
-  domain   = "vpc"
-
-  tags = {
-    Name        = "eureka-eip-${var.environment}"
-    Environment = var.environment
-  }
-}
