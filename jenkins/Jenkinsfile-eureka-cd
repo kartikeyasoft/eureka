@@ -52,55 +52,58 @@ pipeline {
             }
         }
 
-      stage('Set AMI ID') {
-    steps {
-        script {
-            if (params.AMI_ID == '') {               
-                env.AMI_ID = sh(script: """
-                    aws ec2 describe-images \
-                        --region us-east-1 \
-                        --owners self \
-                        --filters "Name=name,Values=myapp-eureka-v*" \
-                        --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
-                        --output text
-                """, returnStdout: true).trim()
-                
-                # Get AMI Name separately
-                env.AMI_NAME = sh(script: """
-                    aws ec2 describe-images \
-                        --region us-east-1 \
-                        --owners self \
-                        --filters "Name=name,Values=myapp-eureka-v*" \
-                        --query 'Images | sort_by(@, &CreationDate) | [-1].Name' \
-                        --output text
-                """, returnStdout: true).trim()
-                
-                # Extract version
-                env.AMI_VERSION = sh(script: """
-                    echo '${env.AMI_NAME}' | grep -oP 'v\\K[0-9.]+'
-                """, returnStdout: true).trim()
-            } else {
-                env.AMI_ID = params.AMI_ID
-                env.AMI_NAME = sh(script: """
-                    aws ec2 describe-images \
-                        --region us-east-1 \
-                        --image-ids ${env.AMI_ID} \
-                        --query 'Images[0].Name' \
-                        --output text
-                """, returnStdout: true).trim()
-                env.AMI_VERSION = sh(script: """
-                    echo '${env.AMI_NAME}' | grep -oP 'v\\K[0-9.]+'
-                """, returnStdout: true).trim()
+        stage('Set AMI ID') {
+            steps {
+                script {
+                    if (params.AMI_ID == '') {               
+                        env.AMI_ID = sh(script: """
+                            aws ec2 describe-images \
+                                --region us-east-1 \
+                                --owners self \
+                                --filters "Name=name,Values=myapp-eureka-v*" \
+                                --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
+                                --output text
+                        """, returnStdout: true).trim()
+                        
+                        // Get AMI Name separately
+                        env.AMI_NAME = sh(script: """
+                            aws ec2 describe-images \
+                                --region us-east-1 \
+                                --owners self \
+                                --filters "Name=name,Values=myapp-eureka-v*" \
+                                --query 'Images | sort_by(@, &CreationDate) | [-1].Name' \
+                                --output text
+                        """, returnStdout: true).trim()
+                        
+                        // Extract version from AMI name
+                        env.AMI_VERSION = sh(script: """
+                            echo '${env.AMI_NAME}' | sed 's/myapp-eureka-v//'
+                        """, returnStdout: true).trim()
+                    } else {
+                        env.AMI_ID = params.AMI_ID
+                        env.AMI_NAME = sh(script: """
+                            aws ec2 describe-images \
+                                --region us-east-1 \
+                                --image-ids ${env.AMI_ID} \
+                                --query 'Images[0].Name' \
+                                --output text
+                        """, returnStdout: true).trim()
+                        env.AMI_VERSION = sh(script: """
+                            echo '${env.AMI_NAME}' | sed 's/myapp-eureka-v//'
+                        """, returnStdout: true).trim()
+                    }
+                    
+                    echo "=========================================="
+                    echo "AMI Information"
+                    echo "=========================================="
+                    echo "AMI ID: ${env.AMI_ID}"
+                    echo "AMI Name: ${env.AMI_NAME}"
+                    echo "Version: ${env.AMI_VERSION}"
+                    echo "=========================================="
+                }
             }
-            
-            echo "=========================================="
-            echo "AMI ID: ${env.AMI_ID}"
-            echo "AMI Name: ${env.AMI_NAME}"
-            echo "Version: ${env.AMI_VERSION}"
-            echo "=========================================="
         }
-    }
-}
+
         stage('Manual Approval') {
             steps {
                 input(
