@@ -3,9 +3,6 @@ pipeline {
 
     parameters {
         string(name: 'AMI_ID', defaultValue: '', description: 'Eureka AMI ID')
-        string(name: 'VPC_ID', defaultValue: 'vpc-0cb7deb47a6bfa727', description: 'VPC ID')
-        string(name: 'SUBNET_ID', defaultValue: 'subnet-0aa31e769c8f4d73e', description: 'Subnet ID')
-        string(name: 'KEY_NAME', defaultValue: 'ksansible', description: 'Key Pair Name')
         choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Terraform action')
     }
 
@@ -22,16 +19,18 @@ pipeline {
             }
         }
 
-        stage('Display Configuration') {
+        stage('Validate Parameters') {
             steps {
-                echo "=========================================="
-                echo "Deploying Eureka with:"
-                echo "AMI ID: ${params.AMI_ID}"
-                echo "VPC: ${params.VPC_ID}"
-                echo "Subnet: ${params.SUBNET_ID}"
-                echo "Key Pair: ${params.KEY_NAME}"
-                echo "Action: ${params.ACTION}"
-                echo "=========================================="
+                script {
+                    echo "=========================================="
+                    echo "Action: ${params.ACTION}"
+                    echo "AMI ID: ${params.AMI_ID}"
+                    echo "=========================================="
+                    
+                    if (params.ACTION == 'apply' && (!params.AMI_ID || params.AMI_ID == '')) {
+                        error "AMI_ID is required for apply action"
+                    }
+                }
             }
         }
 
@@ -43,22 +42,33 @@ pipeline {
             }
         }
 
-        stage('Terraform Apply/Destroy') {
+        stage('Terraform Plan') {
+            when { expression { params.ACTION == 'apply' } }
             steps {
                 dir('terraform/eureka') {
-                    script {
-                        if (params.ACTION == 'apply') {
-                            sh """
-                                terraform apply -auto-approve \
-                                    -var="ami_id=${params.AMI_ID}" \
-                                    -var="vpc_id=${params.VPC_ID}" \
-                                    -var="subnet_id=${params.SUBNET_ID}" \
-                                    -var="key_name=${params.KEY_NAME}"
-                            """
-                        } else {
-                            sh 'terraform destroy -auto-approve'
-                        }
-                    }
+                    sh """
+                        terraform plan \
+                            -var="ami_id=${params.AMI_ID}" \
+                            -out=tfplan
+                    """
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when { expression { params.ACTION == 'apply' } }
+            steps {
+                dir('terraform/eureka') {
+                    sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when { expression { params.ACTION == 'destroy' } }
+            steps {
+                dir('terraform/eureka') {
+                    sh 'terraform destroy -auto-approve'
                 }
             }
         }
@@ -69,14 +79,27 @@ pipeline {
                 dir('terraform/eureka') {
                     script {
                         def public_ip = sh(script: "terraform output -raw eureka_public_ip", returnStdout: true).trim()
+                        def dashboard_url = "http://${public_ip}:8761"
+                        
                         echo "=========================================="
-                        echo "Eureka Deployed Successfully!"
+                        echo "✅ Eureka Deployed Successfully!"
+                        echo "=========================================="
+                        echo "AMI ID: ${params.AMI_ID}"
                         echo "Public IP: ${public_ip}"
-                        echo "Dashboard: http://${public_ip}:8761"
+                        echo "Dashboard: ${dashboard_url}"
                         echo "=========================================="
                     }
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Eureka ${params.ACTION} completed successfully!"
+        }
+        failure {
+            echo "❌ Eureka ${params.ACTION} failed!"
         }
     }
 }
