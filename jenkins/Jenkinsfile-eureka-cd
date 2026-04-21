@@ -4,6 +4,22 @@ pipeline {
     parameters {
         string(name: 'AMI_ID', defaultValue: '', description: 'Eureka AMI ID (leave empty for latest)')
         choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Terraform action')
+        
+        // Choice parameters for AWS resources (update these values manually)
+        choice(name: 'VPC_ID', choices: [
+            'vpc-0cb7deb47a6bfa727',     // Your VPC ID
+            'vpc-xxxxxxxxxxxxxxxxx'       // Add more VPCs if needed
+        ], description: 'Select VPC ID for deployment')
+        
+        choice(name: 'SUBNET_ID', choices: [
+            'subnet-0aa31e769c8f4d73e',   // Your Subnet ID
+            'subnet-xxxxxxxxxxxxxxxxx'     // Add more subnets if needed
+        ], description: 'Select Subnet ID for deployment')
+        
+        choice(name: 'KEY_NAME', choices: [
+            'ksansible',                   // Your Key Pair name
+            'your-other-key'               // Add more key pairs if needed
+        ], description: 'Select SSH Key Pair name')
     }
 
     environment {
@@ -11,6 +27,9 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
         AWS_DEFAULT_REGION    = 'us-east-1'
         TF_VAR_environment    = 'production'
+        TF_VAR_vpc_id         = "${params.VPC_ID}"
+        TF_VAR_subnet_id      = "${params.SUBNET_ID}"
+        TF_VAR_key_name       = "${params.KEY_NAME}"
     }
 
     stages {
@@ -20,11 +39,24 @@ pipeline {
             }
         }
 
+        stage('Display Configuration') {
+            steps {
+                echo "=========================================="
+                echo "Deployment Configuration"
+                echo "=========================================="
+                echo "VPC ID: ${params.VPC_ID}"
+                echo "Subnet ID: ${params.SUBNET_ID}"
+                echo "Key Pair: ${params.KEY_NAME}"
+                echo "Action: ${params.ACTION}"
+                echo "=========================================="
+            }
+        }
+
         stage('Set AMI ID') {
             steps {
                 script {
                     if (params.AMI_ID == '') {
-                        # Get both AMI ID and AMI Name
+                        // Get latest AMI info
                         def ami_info = sh(script: """
                             aws ec2 describe-images \
                                 --region us-east-1 \
@@ -34,7 +66,6 @@ pipeline {
                                 --output json
                         """, returnStdout: true).trim()
                         
-                        # Parse AMI ID and Name
                         env.AMI_ID = sh(script: """
                             echo '${ami_info}' | jq -r '.ImageId'
                         """, returnStdout: true).trim()
@@ -43,13 +74,11 @@ pipeline {
                             echo '${ami_info}' | jq -r '.Name'
                         """, returnStdout: true).trim()
                         
-                        # Extract version from AMI name
                         env.AMI_VERSION = sh(script: """
                             echo '${env.AMI_NAME}' | sed 's/myapp-eureka-v//'
                         """, returnStdout: true).trim()
                     } else {
                         env.AMI_ID = params.AMI_ID
-                        # Get AMI name for provided ID
                         env.AMI_NAME = sh(script: """
                             aws ec2 describe-images \
                                 --region us-east-1 \
@@ -77,7 +106,11 @@ pipeline {
         stage('Manual Approval') {
             steps {
                 input(
-                    message: "Deploy Eureka Version ${env.AMI_VERSION} (AMI: ${env.AMI_ID}) to ${params.ACTION}?",
+                    message: "Deploy Eureka Version ${env.AMI_VERSION} with following configuration?\n" +
+                            "VPC: ${params.VPC_ID}\n" +
+                            "Subnet: ${params.SUBNET_ID}\n" +
+                            "Key Pair: ${params.KEY_NAME}\n" +
+                            "AMI: ${env.AMI_ID}",
                     ok: "Proceed"
                 )
             }
@@ -130,6 +163,9 @@ pipeline {
                         echo "=========================================="
                         echo "AMI Version: ${env.AMI_VERSION}"
                         echo "AMI ID: ${env.AMI_ID}"
+                        echo "VPC: ${params.VPC_ID}"
+                        echo "Subnet: ${params.SUBNET_ID}"
+                        echo "Key Pair: ${params.KEY_NAME}"
                         echo "Public IP: ${public_ip}"
                         echo "Dashboard URL: ${dashboard_url}"
                         echo "=========================================="
