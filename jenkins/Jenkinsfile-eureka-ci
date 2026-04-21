@@ -71,7 +71,7 @@ stage('SonarQube Analysis') {
     }
 }
      
-stage('Bake Golden Image') {
+stage('Bake Golden Image & Record AMI ID') {
     steps {
         script {
             withEnv([
@@ -86,29 +86,19 @@ stage('Bake Golden Image') {
                             -var "service_version=${SERVICE_VERSION}" \
                             -var "service_name=${SERVICE_NAME}" \
                             -var "nexus_url=${NEXUS_URL}" \
-                            eureka.pkr.hcl
+                            eureka.pkr.hcl 2>&1 | tee build-output.txt
+                        
+                        # Extract AMI ID from the build output
+                        AMI_ID=$(grep -oP 'ami-[a-f0-9]+' build-output.txt | tail -1)
+                        echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
+                        echo "Successfully created AMI: $AMI_ID"
                     '''
+                    stash name: 'eureka-ami', includes: 'golden-ami.properties'
                 }
             }
         }
     }
 }
-        stage('Record AMI ID') {
-            steps {
-                script {
-                    dir('packer') {
-                        sh '''
-                            packer build -machine-readable eureka.pkr.hcl 2>&1 | tee output.txt
-                            AMI_ID=$(grep -oP 'ami-[a-f0-9]+' output.txt | tail -1)
-                            echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
-                        '''
-                        stash name: 'eureka-ami', includes: 'golden-ami.properties'
-                    }
-                }
-            }
-        }
-    }
-
     post {
         success {
             echo "Eureka CI & golden image built successfully."
