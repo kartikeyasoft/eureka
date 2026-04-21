@@ -99,6 +99,7 @@ stage('Bake Golden Image & Record AMI ID') {
         }
     }
 }
+}
     post {
         success {
             echo "Eureka CI & golden image built successfully."
