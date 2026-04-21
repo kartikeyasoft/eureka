@@ -20,8 +20,7 @@ variable "service_version" {
 }
 
 variable "nexus_url" {
-  type    = string
-  default = "http://172.21.12.151:8081/repository/maven-releases"
+  type    = string 
 }
 
 source "amazon-ebs" "eureka" {
