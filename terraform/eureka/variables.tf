@@ -24,17 +24,20 @@ variable "instance_type" {
 
 variable "subnet_id" {
   description = "Subnet ID for the instance"
-  type        = "subnet-0aa31e769c8f4d73e"
+  type        = string
+  default     = "subnet-0aa31e769c8f4d73e"  # ← Your actual subnet ID
 }
 
 variable "vpc_id" {
   description = "VPC ID for security group"
-  type        = "vpc-0cb7deb47a6bfa727"
+  type        = string
+  default     = "vpc-0cb7deb47a6bfa727"  # ← Your actual VPC ID
 }
 
 variable "key_name" {
   description = "SSH key pair name"
-  type        = "ksansible"
+  type        = string
+  default     = "ksansible"  # ← Your actual key pair name
 }
 
 variable "assign_eip" {
