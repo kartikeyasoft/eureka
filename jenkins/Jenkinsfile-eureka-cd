@@ -12,6 +12,7 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+        AWS_DEFAULT_REGION    = 'us-east-1'
         TF_VAR_subnet_id      = "${params.SUBNET_ID}"
         TF_VAR_vpc_id         = "${params.VPC_ID}"
         TF_VAR_key_name       = "${params.KEY_NAME}"
@@ -31,6 +32,7 @@ pipeline {
                     if (params.AMI_ID == '') {
                         env.AMI_ID = sh(script: """
                             aws ec2 describe-images \
+                                --region us-east-1 \
                                 --owners self \
                                 --filters "Name=name,Values=myapp-eureka-v*" \
                                 --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
@@ -57,6 +59,9 @@ pipeline {
                         error "KEY_NAME parameter is required"
                     }
                     echo "All parameters validated successfully"
+                    echo "Subnet: ${params.SUBNET_ID}"
+                    echo "VPC: ${params.VPC_ID}"
+                    echo "Key Pair: ${params.KEY_NAME}"
                 }
             }
         }
