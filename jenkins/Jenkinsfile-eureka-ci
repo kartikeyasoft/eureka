@@ -4,29 +4,23 @@ pipeline {
 
     tools {
         maven 'Maven-3.8'
-        jdk 'JDK-17'
+        jdk 'JDK-11'
     }
 
     environment {
-        NEXUS_URL = 'http://34.55.168.165:8081/repository/maven-releases/'
+        PATH = "/usr/bin:${env.PATH}"
+        NEXUS_URL = 'http://35.238.30.216:8081/repository/maven-releases'
         NEXUS_CREDS = credentials('nexus-creds')
         SERVICE_NAME = 'eureka'
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
+        AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+        AWS_DEFAULT_REGION = 'us-east-1'
     }
 
     stages {
         stage('Checkout') {
             steps {
                 git url: 'https://github.com/kartikeyasoft/eureka.git', branch: 'main'
-            }
-        }
-    stage('Debug Workspace') {
-            steps {
-                sh 'pwd'
-                sh 'ls -la'
-                sh 'which packer || echo "Packer not found"'
-                sh 'packer --version || echo "Packer version check failed"'
             }
         }
 
@@ -39,70 +33,94 @@ pipeline {
             }
         }
 
-    stage('Maven Build') {
-    steps {
-        sh 'mvn clean package -Dmaven.test.skip=true'
-    }
-}
-
-stage('Deploy to Nexus') {
-    steps {
-        script {
-            def nexusCreds = env.NEXUS_CREDS   // expects format "username:password"
-            def jarFile = "target/eureka-${env.SERVICE_VERSION}.jar"
-            def nexusPath = "${env.NEXUS_URL}/com/ksapp/eureka/${env.SERVICE_VERSION}/eureka-${env.SERVICE_VERSION}.jar"
-            sh """
-                curl -v -u ${nexusCreds} --upload-file ${jarFile} ${nexusPath}
-            """
+        stage('Maven Build') {
+            steps {
+                sh 'mvn clean package -Dmaven.test.skip=true'
+            }
         }
-    }
-}
 
-stage('SonarQube Analysis') {
-    steps {
-        script {
-            sonarScan(
-                projectKey: 'com.ksapp:eureka',
-                projectName: "eureka-${env.SERVICE_VERSION}",
-                sources: 'src/main/java',
-                binaries: 'target/classes'
-            )
+        stage('Deploy to Nexus') {
+            steps {
+                script {
+                    def jarFile = "target/eureka-${env.SERVICE_VERSION}.jar"
+                    def nexusPath = "${env.NEXUS_URL}/com/ksapp/eureka/${env.SERVICE_VERSION}/eureka-${env.SERVICE_VERSION}.jar"
+                    sh """
+                        curl -v -u ${env.NEXUS_CREDS} --upload-file ${jarFile} ${nexusPath}
+                    """
+                }
+            }
         }
-    }
-}
-     
-stage('Bake Golden Image & Record AMI ID') {
-    steps {
-        script {
-            withEnv([
-                "SERVICE_VERSION=${env.SERVICE_VERSION}",
-                "SERVICE_NAME=${env.SERVICE_NAME}",
-                "NEXUS_URL=${env.NEXUS_URL}"
-            ]) {
-                dir('packer') {
-                    sh '''
-                        packer init eureka.pkr.hcl
-                        packer build \
-                            -var "service_version=${SERVICE_VERSION}" \
-                            -var "service_name=${SERVICE_NAME}" \
-                            -var "nexus_url=${NEXUS_URL}" \
-                            eureka.pkr.hcl 2>&1 | tee build-output.txt
+
+        stage('Bake Golden Image') {
+            steps {
+                script {
+                    withEnv([
+                        "SERVICE_VERSION=${env.SERVICE_VERSION}",
+                        "SERVICE_NAME=${env.SERVICE_NAME}",
+                        "NEXUS_URL=${env.NEXUS_URL}"
+                    ]) {
+                        dir('packer') {
+                            sh '''
+                                packer init eureka.pkr.hcl
+                                packer build \
+                                    -var "service_version=${SERVICE_VERSION}" \
+                                    -var "service_name=${SERVICE_NAME}" \
+                                    -var "nexus_url=${NEXUS_URL}" \
+                                    eureka.pkr.hcl 2>&1 | tee build-output.txt
+                                
+                                # Extract AMI ID
+                                AMI_ID=$(grep -oP 'ami-[a-f0-9]+' build-output.txt | tail -1)
+                                echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
+                                echo "Successfully created AMI: $AMI_ID"
+                            '''
+                            stash name: 'eureka-ami', includes: 'golden-ami.properties'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Trigger CD Pipeline') {
+            steps {
+                script {
+                    if (currentBuild.result == 'SUCCESS') {
+                        echo "=========================================="
+                        echo "Triggering CD pipeline for Eureka"
+                        echo "=========================================="
                         
-                        # Extract AMI ID from the build output
-                        AMI_ID=$(grep -oP 'ami-[a-f0-9]+' build-output.txt | tail -1)
-                        echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
-                        echo "Successfully created AMI: $AMI_ID"
-                    '''
-                    stash name: 'eureka-ami', includes: 'golden-ami.properties'
+                        // Read the AMI ID from the properties file
+                        def amiProps = readProperties file: 'packer/golden-ami.properties'
+                        def amiId = amiProps['GOLDEN_AMI_ID']
+                        
+                        echo "AMI ID: ${amiId}"
+                        echo "Version: ${env.SERVICE_VERSION}"
+                        
+                        // Trigger CD pipeline
+                        build job: 'eureka-cd',
+                            parameters: [
+                                string(name: 'AMI_ID', value: amiId),
+                                string(name: 'ACTION', value: 'apply'),
+                                string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
+                                string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
+                                string(name: 'KEY_NAME', value: 'ksansible')
+                            ],
+                            wait: false
+                        
+                        echo "=========================================="
+                        echo "CD pipeline triggered successfully!"
+                        echo "Check Jenkins job: eureka-cd"
+                        echo "=========================================="
+                    } else {
+                        echo "CI build failed, skipping CD trigger"
+                    }
                 }
             }
         }
     }
-}
-}
+
     post {
         success {
-            echo "Eureka CI & golden image built successfully."
+            echo "Eureka CI & golden image built successfully!"
         }
         failure {
             echo "Eureka CI failed. Check logs above."
