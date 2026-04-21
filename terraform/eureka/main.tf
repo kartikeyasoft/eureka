@@ -26,22 +26,8 @@ data "aws_ami" "eureka" {
   }
 }
 
-# Try to fetch existing security group by name
-data "aws_security_group" "eureka" {
-  filter {
-    name   = "group-name"
-    values = ["eureka-sg-${var.environment}"]
-  }
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-}
-
-# Create security group only if it doesn't exist
+# Create security group (always create new one)
 resource "aws_security_group" "eureka" {
-  count = length(data.aws_security_group.eureka.*.id) == 0 ? 1 : 0
-  
   name        = "eureka-sg-${var.environment}"
   description = "Security group for Eureka service registry"
   vpc_id      = var.vpc_id
@@ -76,17 +62,12 @@ resource "aws_security_group" "eureka" {
   }
 }
 
-# Get the security group ID (either existing or newly created)
-locals {
-  security_group_id = length(data.aws_security_group.eureka.*.id) > 0 ? data.aws_security_group.eureka.id : aws_security_group.eureka[0].id
-}
-
 # EC2 Instance
 resource "aws_instance" "eureka" {
   ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.eureka.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
-  vpc_security_group_ids = [local.security_group_id]
+  vpc_security_group_ids = [aws_security_group.eureka.id]
   key_name               = var.key_name
 
   tags = {
