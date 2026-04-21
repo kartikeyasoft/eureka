@@ -14,7 +14,7 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Install Java 17 (more stable on Ubuntu 22.04)
+    - name: Install Java 17
       apt:
         name: openjdk-17-jre-headless
         state: present
@@ -44,6 +44,8 @@
         timeout: 60
       retries: 3
       delay: 10
+      register: download_result
+      until: download_result is success
 
     - name: Create systemd service file
       template:
