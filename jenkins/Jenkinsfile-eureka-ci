@@ -68,7 +68,6 @@ pipeline {
                                     -var "nexus_url=${NEXUS_URL}" \
                                     eureka.pkr.hcl 2>&1 | tee build-output.txt
                                 
-                                # Extract AMI ID
                                 AMI_ID=$(grep -oP 'ami-[a-f0-9]+' build-output.txt | tail -1)
                                 echo "GOLDEN_AMI_ID=$AMI_ID" > golden-ami.properties
                                 echo "Successfully created AMI: $AMI_ID"
@@ -83,36 +82,24 @@ pipeline {
         stage('Trigger CD Pipeline') {
             steps {
                 script {
-                    if (currentBuild.result == 'SUCCESS') {
-                        echo "=========================================="
-                        echo "Triggering CD pipeline for Eureka"
-                        echo "=========================================="
-                        
-                        // Read the AMI ID from the properties file
-                        def amiProps = readProperties file: 'packer/golden-ami.properties'
-                        def amiId = amiProps['GOLDEN_AMI_ID']
-                        
-                        echo "AMI ID: ${amiId}"
-                        echo "Version: ${env.SERVICE_VERSION}"
-                        
-                        // Trigger CD pipeline
-                        build job: 'eureka-cd',
-                            parameters: [
-                                string(name: 'AMI_ID', value: amiId),
-                                string(name: 'ACTION', value: 'apply'),
-                                string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
-                                string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
-                                string(name: 'KEY_NAME', value: 'ksansible')
-                            ],
-                            wait: false
-                        
-                        echo "=========================================="
-                        echo "CD pipeline triggered successfully!"
-                        echo "Check Jenkins job: eureka-cd"
-                        echo "=========================================="
-                    } else {
-                        echo "CI build failed, skipping CD trigger"
-                    }
+                    def amiProps = readProperties file: 'packer/golden-ami.properties'
+                    def amiId = amiProps['GOLDEN_AMI_ID']
+                    
+                    echo "=========================================="
+                    echo "Triggering CD with AMI: ${amiId}"
+                    echo "=========================================="
+                    
+                    build job: 'eureka-cd',
+                        parameters: [
+                            string(name: 'AMI_ID', value: amiId),
+                            string(name: 'ACTION', value: 'apply'),
+                            string(name: 'VPC_ID', value: 'vpc-0cb7deb47a6bfa727'),
+                            string(name: 'SUBNET_ID', value: 'subnet-0aa31e769c8f4d73e'),
+                            string(name: 'KEY_NAME', value: 'ksansible')
+                        ],
+                        wait: false
+                    
+                    echo "✅ CD pipeline triggered successfully!"
                 }
             }
         }
@@ -120,10 +107,10 @@ pipeline {
 
     post {
         success {
-            echo "Eureka CI & golden image built successfully!"
+            echo "🎉 Eureka CI completed successfully!"
         }
         failure {
-            echo "Eureka CI failed. Check logs above."
+            echo "⚠️ Eureka CI had issues, but CD may have been triggered"
         }
     }
 }
