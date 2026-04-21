@@ -3,8 +3,8 @@ server:
 
 eureka:
   instance:
-    hostname: localhost
     prefer-ip-address: true
+    instance-id: ${spring.cloud.client.ip-address}:${server.port}
   client:
     register-with-eureka: false
     fetch-registry: false
@@ -18,3 +18,9 @@ management:
     web:
       exposure:
         include: health,info
+
+spring:
+  cloud:
+    inetutils:
+      preferred-networks:
+        - 172.31
